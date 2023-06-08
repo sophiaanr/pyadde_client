@@ -1,0 +1,13 @@
+name: pyadde
+channels:
+  - conda-forge
+dependencies:
+  - async-timeout
+  - numpy
+  - python
+  - pyproj
+  - numexpr
+  - pip
+  - matplotlib
+  - pyresample
+  - cartopy
