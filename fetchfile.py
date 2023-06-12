@@ -48,7 +48,6 @@ def nav_transform(area):
 
     navsrt = datetime.datetime.now()
     nav = area.nav
-    dir_bytes = area.adir_bytes
 
     # initialize nvxgoes module
     nvx.nvxini(1, nav)
@@ -56,13 +55,14 @@ def nav_transform(area):
     lat = []
     lon = []
 
-    curr_line = int.from_bytes(dir_bytes[20:24], 'big', signed=True)
-    srt_elem = int.from_bytes(dir_bytes[24:28], 'big', signed=True)
-    num_lines = int.from_bytes(dir_bytes[32:36], 'big', signed=True)
-    num_elems = int.from_bytes(dir_bytes[36:40], 'big', signed=True)
-    line_res = int.from_bytes(dir_bytes[44:48], 'big', signed=True)
-    elem_res = int.from_bytes(dir_bytes[48:52], 'big', signed=True)
-    
+    curr_line = area.directory.line_ul
+    srt_elem = area.directory.element_ul
+    num_lines = area.directory.lines
+    num_elems = area.directory.elements
+    line_res = area.directory.line_res
+    elem_res = area.directory.element_res
+
+
     logger.debug('calculating areafile lat/lon grid')
     for i in range(num_lines):
         curr_elem = srt_elem
