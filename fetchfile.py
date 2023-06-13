@@ -10,6 +10,7 @@ import datetime
 from matplotlib import pyplot as plt
 import projections
 from pyresample import geometry
+from write_netcdf import nav_transform
 
 async def process(host=None, project=0, user='XXXX', kwargs=None):
     try:
@@ -41,57 +42,6 @@ async def collect(hosts=None, project=0, user='XXXX', kwargs=None):
         tasks.append(taks)
     return await asyncio.gather(*tasks, return_exceptions=True)
 
-
-def nav_transform(area):
-    from nvxgoes import nvxgoes as nvx
-    import numpy as np
-
-    navsrt = datetime.datetime.now()
-    nav = area.nav
-
-    # initialize nvxgoes module
-    nvx.nvxini(1, nav)
-
-    lat = []
-    lon = []
-
-    curr_line = area.directory.line_ul
-    srt_elem = area.directory.element_ul
-    num_lines = area.directory.lines
-    num_elems = area.directory.elements
-    line_res = area.directory.line_res
-    elem_res = area.directory.element_res
-
-
-    logger.debug('calculating areafile lat/lon grid')
-    for i in range(num_lines):
-        curr_elem = srt_elem
-        lat_row = []
-        lon_row = []
-        for j in range(num_elems):
-            nvxsae, xpar, ypar, zpar = nvx.nvxsae(curr_line, curr_elem, 0.0)
-            if nvxsae == -1:
-                lat_row.append(-1)
-                lon_row.append(-1)
-            else:
-                lat_row.append(xpar)
-                lon_row.append(-ypar)
-            curr_elem += elem_res
-        lat.append(lat_row)
-        lon.append(lon_row)
-        curr_line += line_res
-
-
-    # calculate satellite height and projection_longitude
-    x, y, z = nvx.satpos(0, nav[2])
-    height = np.sqrt(x**2 + y**2 + z**2) * 1000 # height in meters
-    proj_lat, proj_lon = nvx.nxyzll(x, y, z)
-    proj_lon = -proj_lon
-
-    navstop = datetime.datetime.now()
-    logger.info(f'navigation transformation: {navstop - navsrt}')
-    
-    return lat, lon, proj_lat, proj_lon
     
 doc = """
 usage: ./fetchfile.py host=<host> group=<grp> descriptor=<desc> band=<band> position=<pos> file=<file>...
@@ -176,7 +126,7 @@ if __name__ == "__main__":
                 
                 try:    
                     proj = {'G': 'Geostationary', 'P': 'Plate Carree', 'R': 'Robinson', 'M': 'Mollweide'}
-
+                    logger.debug('Starting nav transform')
                     lat, lon, proj_lat, proj_lon = nav_transform(e)
                     swath_def = geometry.SwathDefinition(lons=lon, lats=lat)
                     print('Projections: ')
@@ -186,23 +136,26 @@ if __name__ == "__main__":
                     print('\t(M)ollweide')
                     print()
                     while True:
-                        i = input('Specify projection (G, P, R, M) or press Enter to quit: ') 
+                        i = input('Specify projection (G, P, R, M) or press Q to quit: ') 
                         match i:
-                            case 'G' | 'Geostationary':
+                            case 'G':
                                 logger.info(f'Drawing {proj[i]} Projection')
                                 data, crs, extent = projections.geostationary(swath_def, e.data[0], proj_lat, proj_lon, 50000)
-                            case 'P' | 'Plate Carree':
+                            case 'P':
                                 logger.info(f'Drawing {proj[i]} Projection')
                                 data, crs, extent = projections.plate_carree(swath_def, e.data[0], proj_lat, proj_lon, 50000)
-                            case 'R' | 'Robinson':
+                            case 'R':
                                 logger.info(f'Drawing {proj[i]} Projection')
                                 data, crs, extent = projections.robinson(swath_def, e.data[0], proj_lat, proj_lon, 50000)
-                            case 'M' | 'Mollweide':
+                            case 'M':
                                 logger.info(f'Drawing {proj[i]} Projection')
                                 data, crs, extent = projections.mollweide(swath_def, e.data[0], proj_lat, proj_lon, 50000)
-                            case _:
+                            case 'Q':
                                 plt.close()
                                 break
+                            case _:
+                                logger.info('Invalid projection')
+                                continue
 
                         ax = projections.plot(data, crs, extent, figtitle=f'{proj[i]} Projection')
                         plt.tight_layout()

@@ -45,5 +45,8 @@ conda activate pyadde  (if not already activated)
 
 ```
 
-### Example:
+### Examples:
 `./fetchfile.py host=geoarc.ssec.wisc.edu user=DAS project=6999 group=AGOES02 descriptor=A-VIS file=AREA9998  unit=BRIT nlines=700 nelems=700 lmag=-22 emag=-22 stime=17.5 etime=17.5 position=0 band=1 day=1978055`
+
+
+`./fetchfile.py host=geoarc.ssec.wisc.edu user=DAS project=6999 group=AGOES02 descriptor=A-IR file=AREA9997 unit=BRIT nlines=99999 nelems=99999 lmag=1 emag=1 stime=17.5 etime=17.5 position=0 band=8 day=1978068`
