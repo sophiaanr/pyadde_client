@@ -67,7 +67,7 @@ HEADER_FIELDS = (
 
     # 57-64
     ('original_source_type', C.c_char*4),
-    ('units', C.c_int32),
+    ('units', C.c_char*4), # changed from int to char
     ('scaling', C.c_int32),
     ('aux_block_offset', C.c_int32),
     ('aux_block_length', C.c_int32),
@@ -162,7 +162,23 @@ def write(area_file, latdata, londata, filename='NCDFxxxx.nc', audit_str=''):
         data.type = adir.source_type.decode() # decode bytes into utf-8 encoded string
         data.coordinates = 'lon lat'
 
-        # finish lines 806 to line 841: units for RAD cal type
+        # lines 806 to line 841: units for RAD cal type
+        # not tested, wouldn't be surprised if it didn't work
+        if cal_type == 'RAD' or cal_type == b'RAD':
+            cal_unit = adir.units  # should be a byte string
+            if isinstance(cal_type, bytes):
+                cal_unit = cal_unit.decode(encoding='utf-8')
+            if isinstance(cal_type, str):
+                if cal_unit.startswith('wP') | cal_unit.startswith('Wp') | cal_unit.startswith('wp') | cal_unit.startswith('WP'):
+                    data.units = 'Watts/meter2/steradian'
+                elif cal_unit.startswith('mP') | cal_unit.startswith('Mp') | cal_unit.startswith('mp') | cal_unit.startswith('MP'):
+                    data.units = 'Milliwatts/meter2/steradian/(cm-1)'
+                elif cal_unit.startswith('wM') | cal_unit.startswith('Wm') | cal_unit.startswith('wm') | cal_unit.startswith('WM'):
+                    data.units = 'Watts/meter2/steradian/micron'
+                else:
+                    data.units = 'Unknown'
+            else:
+                data.units = 'Unknown'
 
         lat = f.createVariable('lat', 'f4', dimensions=('yc', 'xc'))
         lat.long_name = 'lat'
