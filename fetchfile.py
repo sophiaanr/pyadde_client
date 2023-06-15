@@ -137,23 +137,22 @@ if __name__ == "__main__":
                     print()
                     while True:
                         i = input('Specify projection (G, P, R, M) or press Q to quit: ') 
-                        match i:
-                            case 'G':
+                        if i == 'G':
                                 logger.info(f'Drawing {proj[i]} Projection')
                                 data, crs, extent = projections.geostationary(swath_def, e.data[0], proj_lat, proj_lon, 50000)
-                            case 'P':
+                        elif i == 'P':
                                 logger.info(f'Drawing {proj[i]} Projection')
                                 data, crs, extent = projections.plate_carree(swath_def, e.data[0], proj_lat, proj_lon, 50000)
-                            case 'R':
+                        elif i == 'R':
                                 logger.info(f'Drawing {proj[i]} Projection')
                                 data, crs, extent = projections.robinson(swath_def, e.data[0], proj_lat, proj_lon, 50000)
-                            case 'M':
+                        elif i == 'M':
                                 logger.info(f'Drawing {proj[i]} Projection')
                                 data, crs, extent = projections.mollweide(swath_def, e.data[0], proj_lat, proj_lon, 50000)
-                            case 'Q':
+                        elif i == 'Q':
                                 plt.close()
                                 break
-                            case _:
+                        else:
                                 logger.info('Invalid projection')
                                 continue
 
