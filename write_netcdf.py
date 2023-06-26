@@ -169,22 +169,22 @@ def write(area_file, latdata, londata, filename='NCDFxxxx.nc', audit_str=''):
             if isinstance(cal_type, bytes):
                 cal_unit = cal_unit.decode(encoding='utf-8')
             if isinstance(cal_type, str):
-                if cal_unit.startswith('wP') | cal_unit.startswith('Wp') | cal_unit.startswith('wp') | cal_unit.startswith('WP'):
+                if cal_unit.startswith('wP') or cal_unit.startswith('Wp') or cal_unit.startswith('wp') or cal_unit.startswith('WP'):
                     data.units = 'Watts/meter2/steradian'
-                elif cal_unit.startswith('mP') | cal_unit.startswith('Mp') | cal_unit.startswith('mp') | cal_unit.startswith('MP'):
+                elif cal_unit.startswith('mP') or cal_unit.startswith('Mp') or cal_unit.startswith('mp') or cal_unit.startswith('MP'):
                     data.units = 'Milliwatts/meter2/steradian/(cm-1)'
-                elif cal_unit.startswith('wM') | cal_unit.startswith('Wm') | cal_unit.startswith('wm') | cal_unit.startswith('WM'):
+                elif cal_unit.startswith('wM') or cal_unit.startswith('Wm') or cal_unit.startswith('wm') or cal_unit.startswith('WM'):
                     data.units = 'Watts/meter2/steradian/micron'
                 else:
                     data.units = 'Unknown'
             else:
                 data.units = 'Unknown'
 
-        lat = f.createVariable('lat', 'f4', dimensions=('yc', 'xc'))
+        lat = f.createVariable('lat', 'f4', dimensions=('yc', 'xc'), fill_value=0x7FC00000)
         lat.long_name = 'lat'
         lat.units = 'degrees_north'
 
-        lon = f.createVariable('lon', 'f4', dimensions=('yc', 'xc'))
+        lon = f.createVariable('lon', 'f4', dimensions=('yc', 'xc'), fill_value=0x7FC00000)
         lon.long_name = 'lon'
         lon.units = 'degrees_east'
 

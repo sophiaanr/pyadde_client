@@ -11,6 +11,41 @@ from matplotlib import pyplot as plt
 import projections
 from pyresample import geometry
 from write_netcdf import nav_transform
+import write_netcdf
+import math
+
+MISSING_VALUE = 2143289344 # defined by mcidas
+
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371
+    lat1 = math.radians(lat1)
+    lon1 = math.radians(lon1)
+    lat2 = math.radians(lat2)
+    lon2 = math.radians(lon2)
+
+    x1 = lat2 - lat1
+    y1 = lon2 - lon1
+
+    a = math.sin(x1 / 2)**2 + math.cos(lat2) * math.cos(lat1) * math.sin(y1 / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    return R * c
+
+def nn_radius(lat, lon):
+    mid = int(len(lat) / 2)
+    srt_idx = None
+    for i in range(len(lat)):
+        if lat[mid][i] != MISSING_VALUE:
+            srt_idx = i
+            break
+    
+    if not srt_idx:
+        return 50000
+
+    sum = 0
+    for i in range(srt_idx, srt_idx + 10):
+        sum += haversine(lat[mid][i], lon[mid][i], lat[mid][i+1], lon[mid][i+1])
+    return (sum / 10) * 1000
+
 
 async def process(host=None, project=0, user='XXXX', kwargs=None):
     try:
@@ -25,7 +60,7 @@ async def process(host=None, project=0, user='XXXX', kwargs=None):
             except Exception as e:
                 logger.error(e)
                 #efp = io.StringIO()
-                #traceback.print_exc(file=efp)
+                traceback.print_exc()
                 #message = efp.getvalue()
                 #logger.error(message)
                 #raise
@@ -55,7 +90,8 @@ usage: ./fetchfile.py host=<host> group=<grp> descriptor=<desc> band=<band> posi
     position: single position or iter of positions or ALL
 
   non required (default) params: 
-    file: file name binary data is saved to, default=None
+    file: file name binary AREA file data is saved to, default=None
+    netcdf: file name netCDF4 data is saved to, default=None
     coord_type: (E)ARTH, (I)mage, or (A)rea, default=A
     coord_pos: (C)entered or (U)pper, default=U
     coord_start_dim1: lat or line number, default=None
@@ -87,8 +123,9 @@ if __name__ == "__main__":
     except getopt.GetoptError:
         pass
 
-    if len(sys.argv) > 2:
-        clargs = dict((s.split('=') + [None])[:2] for s in sys.argv[1:])
+    args = sys.argv
+    if len(args) > 2:
+        clargs = dict((s.split('=') + [None])[:2] for s in args[1:])
     else:
         logger.debug("Arguments expected")
         print(doc)
@@ -101,10 +138,13 @@ if __name__ == "__main__":
 
     username = 'XXXX'
     prj = 0
+    netcdf = None
     if 'user' in clargs:
         username = clargs.pop('user')
     if 'project' in clargs:
         prj = clargs.pop('project')
+    if 'netcdf' in clargs:
+        netcdf = clargs.pop('netcdf')
 
     then = datetime.datetime.now()
     loop = asyncio.new_event_loop()
@@ -127,7 +167,15 @@ if __name__ == "__main__":
                 try:    
                     proj = {'G': 'Geostationary', 'P': 'Plate Carree', 'R': 'Robinson', 'M': 'Mollweide'}
                     logger.debug('Starting nav transform')
+                    now = datetime.datetime.now()
                     lat, lon, proj_lat, proj_lon = nav_transform(e)
+                    logger.debug(f'{datetime.datetime.now() - now}')
+                    
+                    radius = nn_radius(lat, lon) 
+                    logger.debug(f'Writing netCDF file: {netcdf}')
+                    arg_str = ' '.join(args) # turn list of cla's to string
+                    write_netcdf.write(e, lat, lon, filename=netcdf, audit_str=arg_str)
+
                     swath_def = geometry.SwathDefinition(lons=lon, lats=lat)
                     print('Projections: ')
                     print('\t(G)eostationary')
@@ -137,22 +185,27 @@ if __name__ == "__main__":
                     print()
                     while True:
                         i = input('Specify projection (G, P, R, M) or press Q to quit: ') 
-                        if i == 'G':
+                        match i:
+                            case 'G' | 'g':
+                                i = i.upper()
                                 logger.info(f'Drawing {proj[i]} Projection')
-                                data, crs, extent = projections.geostationary(swath_def, e.data[0], proj_lat, proj_lon, 50000)
-                        elif i == 'P':
+                                data, crs, extent = projections.geostationary(swath_def, e.data[0], proj_lat, proj_lon, radius)
+                            case 'P' | 'p':
+                                i = i.upper()
                                 logger.info(f'Drawing {proj[i]} Projection')
-                                data, crs, extent = projections.plate_carree(swath_def, e.data[0], proj_lat, proj_lon, 50000)
-                        elif i == 'R':
+                                data, crs, extent = projections.plate_carree(swath_def, e.data[0], proj_lat, proj_lon, radius)
+                            case 'R' | 'r':
+                                i = i.upper()
                                 logger.info(f'Drawing {proj[i]} Projection')
-                                data, crs, extent = projections.robinson(swath_def, e.data[0], proj_lat, proj_lon, 50000)
-                        elif i == 'M':
+                                data, crs, extent = projections.robinson(swath_def, e.data[0], proj_lat, proj_lon, radius)
+                            case 'M' | 'm':
+                                i = i.upper()
                                 logger.info(f'Drawing {proj[i]} Projection')
-                                data, crs, extent = projections.mollweide(swath_def, e.data[0], proj_lat, proj_lon, 50000)
-                        elif i == 'Q':
+                                data, crs, extent = projections.mollweide(swath_def, e.data[0], proj_lat, proj_lon, radius)
+                            case 'Q' | 'q':
                                 plt.close()
                                 break
-                        else:
+                            case _:
                                 logger.info('Invalid projection')
                                 continue
 
@@ -161,7 +214,7 @@ if __name__ == "__main__":
                         plt.show(block=False)
 
                 except Exception as err:
-                    print(e)
+                    traceback.print_exc()
                     logger.error(err)
 
             except Exception as err:

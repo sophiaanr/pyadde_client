@@ -3,8 +3,10 @@ from pyresample import kd_tree, geometry
 from matplotlib import pyplot as plt
 from pyresample.area_config import create_area_def
 import matplotlib as mpl
-# import cartopy.crs as ccrs
-# from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import cartopy.crs as ccrs
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import numpy as np
+
 
 def plate_carree(swath_def, data, proj_lat, proj_lon, radius_nn=50000):
     projection = {'proj': 'eqc', 'ellps':'WGS84', 'lon_0': proj_lon, 'lat_0': proj_lat}
@@ -49,19 +51,14 @@ def plot(img_data, crs, extent, figsize=(8,8), cmap='gist_gray', figtitle=''):
     fig = plt.figure(figsize=figsize)
     ax = plt.axes(projection=crs) 
     ax.set_title(figtitle)
-    extents = (extent[0], extent[2], extent[1], extent[3])
+    ax.set_global()
     
     cmap = mpl.colormaps[cmap]
     cmap.set_under(color='white')
-    plt.imshow(img_data, transform=crs, extent=extents, cmap=cmap, vmin=0.5)
+    plt.imshow(img_data, transform=crs, extent=crs.bounds, cmap=cmap, vmin=0.5)
     ax.set_frame_on(False)
     ax.coastlines()
     gl = ax.gridlines(draw_labels=True)
+    plt.tight_layout()
     return ax
-    #gl.xlocator = mpl.ticker.FixedLocator([-180, -150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180])
-    #gl.ylocator = mpl.ticker.FixedLocator([-180, -150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180])
-    #gl.xformatter = LONGITUDE_FORMATTER
-    #gl.yformatter = LATITUDE_FORMATTER
-    #plt.tight_layout()
-    #plt.show()
 
