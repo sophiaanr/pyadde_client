@@ -10,9 +10,11 @@ import datetime
 from matplotlib import pyplot as plt
 import projections
 from pyresample import geometry
-from write_netcdf import nav_transform
-import write_netcdf
+from write_netcdf import nav_transform, write
 import math
+import warnings
+
+warnings.filterwarnings('ignore', category=RuntimeWarning)
 
 MISSING_VALUE = 2143289344 # defined by mcidas
 
@@ -174,7 +176,10 @@ if __name__ == "__main__":
                     radius = nn_radius(lat, lon) 
                     logger.debug(f'Writing netCDF file: {netcdf}')
                     arg_str = ' '.join(args) # turn list of cla's to string
-                    write_netcdf.write(e, lat, lon, filename=netcdf, audit_str=arg_str)
+                    if netcdf:
+                        logger.debug(f'Writing netCDF file: {netcdf}')
+                        arg_str = ' '.join(args) # turn list of cla's to string 
+                        write(e, lat, lon, filename=netcdf, audit_str=arg_str) 
 
                     swath_def = geometry.SwathDefinition(lons=lon, lats=lat)
                     print('Projections: ')
