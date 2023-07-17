@@ -13,6 +13,7 @@ from pyresample import geometry
 from write_netcdf import nav_transform, write
 import math
 import warnings
+import typing
 
 warnings.filterwarnings('ignore', category=RuntimeWarning)
 
@@ -174,7 +175,6 @@ if __name__ == "__main__":
                     logger.debug(f'{datetime.datetime.now() - now}')
                     
                     radius = nn_radius(lat, lon) 
-                    logger.debug(f'Writing netCDF file: {netcdf}')
                     arg_str = ' '.join(args) # turn list of cla's to string
                     if netcdf:
                         logger.debug(f'Writing netCDF file: {netcdf}')

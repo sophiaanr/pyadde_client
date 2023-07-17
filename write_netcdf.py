@@ -81,11 +81,23 @@ HEADER_FIELDS = (
 def write(area_file, latdata, londata, filename='NCDFxxxx.nc', audit_str=''):
     '''Write netCDF file from AreaFile'''
 
+    CFstatus = True
     adir = area_file.directory
     with nc.Dataset(filename, 'w', format='NETCDF4') as f:
-        f.createDimension('xc', adir.elements)
-        f.createDimension('yc', adir.lines)
-        f.createDimension('time', 1)
+
+        if adir.spectral_band_count > 1:
+            CFstatus = False
+        
+        # define dimensions
+        if CFstatus:
+            f.createDimension('xc', adir.elements)
+            f.createDimension('yc', adir.lines)
+            f.createDimension('time', 1)
+        else:
+            f.createDimension('lines', adir.lines)
+            f.createDimension('elems', adir.elements)
+            f.createDimension('bands', adir.spectral_band_count)
+
 
         num_chunks = 1
         if len(audit_str) > 0:
@@ -94,6 +106,7 @@ def write(area_file, latdata, londata, filename='NCDFxxxx.nc', audit_str=''):
         f.createDimension('auditCount', adir.comment_count + num_chunks)
         f.createDimension('auditSize', 80) # length of single comment card
 
+        # define variables
         version = f.createVariable('version', 'i4') # 'i4' is signed 4 bit integer
         version.longname = 'McIDAS area file version' # add attribute
 
@@ -112,9 +125,17 @@ def write(area_file, latdata, londata, filename='NCDFxxxx.nc', audit_str=''):
         srtelem = f.createVariable('startElem', 'i4')
         srtelem.long_name = 'starting image element (in satellite coordintes)'
 
-        time = f.createVariable('time', 'i4', dimensions=('time'))
-        time.long_name = 'seconds since 1970-1-1 0:0:0'
-        time.units = 'seconds since 1970-1-1 0:0:0'
+        if not CFstatus:
+            numlines = f.createVariable('numLines', 'i4')
+            numlines.long_name = 'number of lines'
+            
+            numelems = f.createVariable('numElems', 'i4')
+            numelems.long_name = 'number of elements'
+
+        if CFstatus: 
+            time = f.createVariable('time', 'i4', dimensions=('time'))
+            time.long_name = 'seconds since 1970-1-1 0:0:0'
+            time.units = 'seconds since 1970-1-1 0:0:0'
 
         datawid = f.createVariable('dataWidth', 'i4')
         datawid.long_name = 'number of 8-bit bytes per source data point'
@@ -136,13 +157,20 @@ def write(area_file, latdata, londata, filename='NCDFxxxx.nc', audit_str=''):
         createtime = f.createVariable('crTime', 'i4')
         createtime.long_name = 'image creation time in UTC in hhmmss format'
 
-        band = f.createVariable('bands', 'i4')
-        band.long_name = 'satellite channel number'
+        if CFstatus:
+            band = f.createVariable('bands', 'i4')
+            band.long_name = 'satellite channel number'
+        else:
+            band = f.createVariable('bands', 'i4', dimensions=('bands'))
+            band.long_name = 'satellite bands'
 
         audittrail = f.createVariable('auditTrail', 'S1', dimensions=('auditCount', 'auditSize'))
         audittrail.long_name = 'audit trail'
 
-        data = f.createVariable('data', 'f4', ('time', 'yc', 'xc'))
+        if CFstatus:
+            data = f.createVariable('data', 'f4', dimensions=('time', 'yc', 'xc'))
+        else:
+            data = f.createVariable('data', 'f4', dimensions=('bands', 'lines', 'elems'))
 
         cal_type = adir.cal_type
         match cal_type:
@@ -160,10 +188,12 @@ def write(area_file, latdata, londata, filename='NCDFxxxx.nc', audit_str=''):
                 data.long_name = 'data'
         
         data.type = adir.source_type.decode() # decode bytes into utf-8 encoded string
-        data.coordinates = 'lon lat'
+        
+        if CFstatus:
+            data.coordinates = 'lon lat'
 
         # lines 806 to line 841: units for RAD cal type
-        # not tested, wouldn't be surprised if it didn't work
+        # not sure if this works
         if cal_type == 'RAD' or cal_type == b'RAD':
             cal_unit = adir.units  # should be a byte string
             if isinstance(cal_type, bytes):
@@ -179,21 +209,45 @@ def write(area_file, latdata, londata, filename='NCDFxxxx.nc', audit_str=''):
                     data.units = 'Unknown'
             else:
                 data.units = 'Unknown'
+        elif cal_type == 'TEMP' or cal_type == b'TEMP':
+            data.units = 'K'
+        elif cal_type == 'ALB' or cal_type == b'ALB':
+            data.units = 'percent'
 
-        lat = f.createVariable('lat', 'f4', dimensions=('yc', 'xc'), fill_value=0x7FC00000)
-        lat.long_name = 'lat'
-        lat.units = 'degrees_north'
+        if CFstatus:
+            lat = f.createVariable('lat', 'f4', dimensions=('yc', 'xc'), fill_value=0x7FC00000)
+            lat.long_name = 'lat'
+            lat.units = 'degrees_north'
 
-        lon = f.createVariable('lon', 'f4', dimensions=('yc', 'xc'), fill_value=0x7FC00000)
-        lon.long_name = 'lon'
-        lon.units = 'degrees_east'
+            lon = f.createVariable('lon', 'f4', dimensions=('yc', 'xc'), fill_value=0x7FC00000)
+            lon.long_name = 'lon'
+            lon.units = 'degrees_east'
 
-        f.Conventions = 'CF-1.10' # newest version of cf compliance
+            f.Conventions = 'CF-1.10' # newest version of cf compliance
+        else:
+            lat = f.createVariable('lat', 'f4', dimensions=('lines', 'elems'), fill_value=0x7FC00000)
+            lat.long_name = 'latitude'
+            lat.units = 'degrees'
+
+            lon = f.createVariable('lon', 'f4', dimensions=('lines', 'elems'), fill_value=0x7FC00000)
+            lon.long_name = 'longitude'
+            lon.units = 'degrees'
+
+        # define global attributes
         f.Source = 'McIDAS Area File'
         f.SatelliteSensor = adir.sensors[adir.sensor_source_number]
 
         version[:] = adir.image_type
         sensor[:] = adir.sensor_source_number
+
+        if CFstatus:
+            time[:] = (adir.nominal_time - datetime.datetime(1970, 1, 1)).total_seconds() # timestamp() uses local time not UTC ??
+            band[:] = adir.bands[0]
+        else:
+            numlines[:] = adir.lines
+            numelems[:] = adir.elements
+            band[:] = adir.bands
+
         yyyddd = adir.yyyddd
         year = ((yyyddd // 1000) % 1900) + 1900
         imgdate[:] = int(f'{year}{yyyddd % 1000:03}')
@@ -206,9 +260,11 @@ def write(area_file, latdata, londata, filename='NCDFxxxx.nc', audit_str=''):
         prefix[:] = adir.line_prefix_length
         createdate[:] = adir.file_yyyddd
         createtime[:] = adir.file_hhmmss
-        time[:] = (adir.nominal_time - datetime.datetime(1970, 1, 1)).total_seconds() # timestamp() uses local time not UTC ??
-        band[:] = adir.bands[0]
-        data[:] = area_file.data
+        
+        if CFstatus:
+            data[:] = area_file.data
+        else:
+            data[:] = area_file.data
 
         lat[:] = latdata
         lon[:] = londata
@@ -263,14 +319,54 @@ def nav_transform(area):
     proj_lon = -proj_lon
 
     navstop = datetime.datetime.now()
+    print(navstop - navsrt)
     return lat, lon, proj_lat, proj_lon
 
+def nav_transform2(area):
+    from nvxgoes import nvxgoes as nvx
+    navsrt = datetime.datetime.now()
+    nav = area.nav
 
-#if __name__ == '__main__':
-#    from pyarea.file import AreaFile
-#    with open('../AREA9998', 'rb') as f:
-#        c = f.read()   
+    nvx.nvxini(1, nav)
+    curr_line = area.directory.line_ul
+    curr_elem = area.directory.element_ul
+    num_lines = area.directory.lines
+    num_elems = area.directory.elements
+    line_res = area.directory.line_res
+    elem_res = area.directory.element_res
+
+    lines = [curr_line + i * line_res for i in range(num_lines)]
+    elems = [curr_elem + i * elem_res for i in range(num_elems)]
+    
+    lat = [ [-1] * num_elems for i in range(num_lines) ]
+    lon = [ [-1] * num_elems for i in range(num_lines) ]
+    
+    for i in range(num_lines):
+        for j in range(num_elems):
+            nvxsae, xpar, ypar, zpar = nvx.nvxsae(lines[i], elems[j], 0.0)
+            if nvxsae != -1:
+                lat[i][j] = xpar
+                lon[i][j] = ypar
+    
+    x, y, z = nvx.satpos(0, nav[2])
+    height = np.sqrt(x**2 + y**2 + z**2) * 1000 # height in meters
+    proj_lat, proj_lon = nvx.nxyzll(x, y, z)
+    proj_lon = -proj_lon
+    print(datetime.datetime.now() - navsrt)
+
+    return lat, lon, proj_lat, proj_lon
+
+if __name__ == '__main__':
+    from pyarea.file import AreaFile
+    with open('../AREA9996', 'rb') as f:
+        c = f.read()   
 #    audit = './fetchfile.py host=geoarc.ssec.wisc.edu user=DAS project=6999 group=AGOES02 descriptor=A-VIS file=AREA9998  unit=BRIT nlines=700 nelems=700 lmag=-22 emag=-22 stime=17.5 etime=17.5 position=0 band=1 day=1978055'
-#    a = AreaFile(c)
-#    latdata, londata, _, _ = nav_transform(a)
+    a = AreaFile(c)
+    lat, lon, _, _ = nav_transform2(a)
+    print(lat[355][345])
+    print(lon[355][345])
+    latdata, londata, _, _ = nav_transform(a)
+    print(latdata[355][345])
+    print(londata[355][345])
+
 #    write(a, latdata, londata, 'test9998.nc', audit)
