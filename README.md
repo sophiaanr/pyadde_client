@@ -50,3 +50,5 @@ conda activate pyadde  (if not already activated)
 
 
 `./fetchfile.py host=archive.ssec.wisc.edu user=DAS project=6999 group=AGOES02 descriptor=A-IR file=AREA9997 unit=BRIT nlines=99999 nelems=99999 lmag=1 emag=1 stime=17.5 etime=17.5 position=0 band=8 day=1978068 netcdf=ncdf9997.nc`
+
+`./fetchfile.py host=easta.ssec.wisc.edu group=EASTA user=DAS project=6999 descriptor=CONUS position=0 band=7 day=23264 emag=-3 lmag=-3 unit=BRIT`
